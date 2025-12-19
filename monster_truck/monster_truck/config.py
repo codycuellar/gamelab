@@ -17,21 +17,19 @@ class TruckConfig:
     name: str
     chassis_sprite: str
     wheel_sprite: str
-    length: float
-    height: float
-    mass: float
-    friction: float
-    top_speed: float
-    accel_rate: float
-    decel_rate: float
-    brake_rate: float
-    wheel_radius: float
-    wheel_rear_offset: pymunk.Vec2d
-    wheel_front_offset: pymunk.Vec2d
-    wheel_mass: float
-    wheel_friction: float
-    max_wheel_speed: float
-    wheel_torque: float
+    length: float  # meters
+    height: float  # meters
+    mass: float  # Kg
+    body_friction: float  # friction coeff
+    top_speed: float  # m/s
+    wheel_radius: float  # meters
+    wheel_rear_offset: pymunk.Vec2d  # meters
+    wheel_front_offset: pymunk.Vec2d  # meters
+    wheel_mass: float  # Kg
+    wheel_friction: float  # friction coeff
+    rolling_resistance: float  # coeff/sec
+    wheel_torque: float  # nm
+    brake_torque: float  # nm
 
     @property
     def size(self):
@@ -56,21 +54,19 @@ TRUCKS: list[TruckConfig] = [
         name="Gravedigger",
         chassis_sprite="truck_1_body.png",
         wheel_sprite="truck_1_wheel.png",
-        length=4.7,
-        height=2.0,
-        mass=500,
-        friction=0.32,
-        top_speed=26.0,
-        accel_rate=26.0 / 3,
-        decel_rate=26.0 / 6,
-        brake_rate=26.0 / 1.5,
+        length=4.7,  # meters
+        height=2.0,  # meters
+        mass=3500,
+        body_friction=0.32,
+        top_speed=8.0,
         wheel_radius=0.9,
         wheel_rear_offset=pymunk.Vec2d(-4.7 / 3, -2.0 / 1.4),
         wheel_front_offset=pymunk.Vec2d(4.7 / 3, -2.0 / 1.4),
-        wheel_mass=250,
-        wheel_friction=0.81,
-        max_wheel_speed=26.0,
-        wheel_torque=60000,
+        wheel_mass=600,  # two wheels on axle
+        wheel_friction=1.5,
+        rolling_resistance=0.1,
+        wheel_torque=10000,
+        brake_torque=15000,
     ),
     # Add more trucks here...
 ]

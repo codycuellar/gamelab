@@ -9,7 +9,7 @@ from PIL import Image
 
 from monster_truck.config import *
 from monster_truck.truck import Truck
-from monster_truck.util import to_screen_coords
+from monster_truck.util import Camera
 
 Polyline = List[pymunk.Vec2d]
 PolylineSet = List[Polyline]
@@ -76,25 +76,6 @@ def load_level_geometry(level_config: LevelConfig, space: pymunk.Space):
     return terrain_polylines, truck_pos
 
 
-def draw_terrain(
-    screen: pygame.Surface,
-    camera: pymunk.Vec2d,
-    terrain_polylines,
-    color=(173, 144, 127),
-    width=3,
-):
-    for polyline in terrain_polylines:
-        if len(polyline) < 2:
-            continue
-        points_px = [to_screen_coords(pt + camera) for pt in polyline]
-        pygame.draw.lines(screen, color, False, points_px, width)
-
-
-def get_camera_pos(base_pos: pymunk.Vec2d):
-    center_screen = pymunk.Vec2d(SCREEN_W / 2, SCREEN_H / 2) / PX_PER_METER
-    return center_screen - base_pos
-
-
 def run_game():
     dt = 1.0 / FPS
 
@@ -109,9 +90,11 @@ def run_game():
     terrain_segs, truck_pos = load_level_geometry(level_config, space)
     truck = Truck(truck_config, space, truck_pos)
 
+    camera = Camera((SCREEN_W, SCREEN_H), screen_scale=PX_PER_METER)
+
     # ---------- Main loop ----------
     while True:
-        camera = get_camera_pos(truck.chassis_body.position)
+        camera.base_pos = truck.chassis_body.position
 
         keys = pygame.key.get_pressed()
 
@@ -120,26 +103,32 @@ def run_game():
                 return
 
         if keys[pygame.K_q]:
-            truck.reset_position()
+            truck = Truck(truck_config, space, truck_pos)
+            continue
 
         input_direction = 0
         if keys[pygame.K_RIGHT]:
-            input_direction = 1  # Forward
+            input_direction = -1  # Forward
         elif keys[pygame.K_LEFT]:
-            input_direction = -1  # Reverse
+            input_direction = 1  # Reverse
 
         is_braking = keys[pygame.K_SPACE]  # New check for spacebar
 
-        truck.motor_front.update_target(input_direction)
-        truck.motor_rear.update_target(input_direction)
+        truck.motor_front.update_target(input_direction, is_braking)
+        truck.motor_rear.update_target(input_direction, is_braking)
 
-        truck.motor_front.step(dt, is_braking)
-        truck.motor_rear.step(dt, is_braking)
+        truck.motor_front.step(dt)
+        truck.motor_rear.step(dt)
 
         screen.fill((174, 211, 250))
 
         truck.draw(screen, camera)
-        draw_terrain(screen, camera, terrain_segs)
+        color = (173, 144, 127)
+        for polyline in terrain_segs:
+            if len(polyline) < 2:
+                continue
+            points_px = [camera.to_screen_coords(pt) for pt in polyline]
+            pygame.draw.lines(screen, color, False, points_px, 2)
 
         pygame.display.flip()
         space.step(dt)
