@@ -3,7 +3,6 @@ import pygame
 from monster_truck.config import TruckConfig
 from monster_truck.util import (
     Camera,
-    SpriteRenderable,
     draw_sprite,
     load_sprite_for_body,
 )
@@ -95,8 +94,8 @@ class Truck:
 
         # 2. Damped Spring (The Shock)
         # The spring should pull the wheel toward the 'chassis_offset'
-        stiffness = 90000.0  # High for a heavy monster truck
-        damping = 8000.0  # High to stop the 'jiggle'
+        stiffness = 120000.0  # High for a heavy monster truck
+        damping = 12000.0  # High to stop the 'jiggle'
         rest_length = 0.0  # 0 means it wants the anchors to meet exactly
 
         spring = pymunk.DampedSpring(
