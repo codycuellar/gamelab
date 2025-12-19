@@ -61,17 +61,12 @@ class Truck:
         self.wheel_r_body.position = config.wheel_rear_offset
         self.wheel_f_body.position = config.wheel_front_offset
 
+        self.add_suspension(space, self.wheel_r_body, config.wheel_rear_offset)
+        self.add_suspension(space, self.wheel_f_body, config.wheel_front_offset)
+
         space.add(self.chassis_body, chassis_s)
         space.add(self.wheel_r_body, wheel_r_s)
         space.add(self.wheel_f_body, wheel_f_s)
-        space.add(
-            pymunk.PivotJoint(
-                self.wheel_r_body, self.chassis_body, self.wheel_r_body.position
-            ),
-            pymunk.PivotJoint(
-                self.wheel_f_body, self.chassis_body, self.wheel_f_body.position
-            ),
-        )
 
         self.init_position()
 
@@ -79,6 +74,42 @@ class Truck:
         draw_sprite(screen, self.chassis_renderable, camera)
         draw_sprite(screen, self.wheel_r_renderable, camera)
         draw_sprite(screen, self.wheel_f_renderable, camera)
+
+    def add_suspension(
+        self, space: pymunk.Space, wheel_body: pymunk.Body, chassis_offset: pymunk.Vec2d
+    ):
+        # 1. Groove Joint (The Slider)
+        # These coordinates are LOCAL to self.chassis_body.
+        # If +Y is UP, the 'bottom' of the travel should be lower (more negative)
+        # than the 'top'.
+
+        # Let's define the rail: the wheel can slide from 0.2m above its
+        # default spot to 0.4m below it.
+        groove_top = chassis_offset + pymunk.Vec2d(0, 0.4)
+        groove_bottom = chassis_offset + pymunk.Vec2d(0, -0.8)
+
+        # anchor_b is the center of the wheel (local)
+        groove = pymunk.GrooveJoint(
+            self.chassis_body, wheel_body, groove_top, groove_bottom, (0, 0)
+        )
+
+        # 2. Damped Spring (The Shock)
+        # The spring should pull the wheel toward the 'chassis_offset'
+        stiffness = 90000.0  # High for a heavy monster truck
+        damping = 8000.0  # High to stop the 'jiggle'
+        rest_length = 0.0  # 0 means it wants the anchors to meet exactly
+
+        spring = pymunk.DampedSpring(
+            self.chassis_body,
+            wheel_body,
+            chassis_offset,  # Anchor on chassis
+            (0, 0),  # Anchor on wheel center
+            rest_length,
+            stiffness,
+            damping,
+        )
+
+        space.add(groove, spring)
 
     def init_position(self):
         """Move the truck to a new base position and reset velocities."""

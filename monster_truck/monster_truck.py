@@ -92,6 +92,8 @@ def run_game():
 
     camera = Camera((SCREEN_W, SCREEN_H), screen_scale=PX_PER_METER)
 
+    # draw_options = pymunk.pygame_util.DrawOptions(screen)
+    # draw_options.transform = pymunk.Transform(15, 0, 0, -15, 0, SCREEN_H)
     # ---------- Main loop ----------
     while True:
         camera.base_pos = truck.chassis_body.position
@@ -130,6 +132,7 @@ def run_game():
             points_px = [camera.to_screen_coords(pt) for pt in polyline]
             pygame.draw.lines(screen, color, False, points_px, 2)
 
+        # space.debug_draw(draw_options)
         pygame.display.flip()
         space.step(dt)
         clock.tick(FPS)
