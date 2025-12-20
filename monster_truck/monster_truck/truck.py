@@ -1,3 +1,4 @@
+import math
 import pymunk
 import pygame
 from monster_truck.config import TruckConfig
@@ -26,24 +27,18 @@ class Truck:
         self.default_position = default_position
 
         self.chassis_body = pymunk.Body(config.mass, truck_moment)
+        self.chassis_body.position = default_position
+
         self.wheel_r_body = pymunk.Body(config.wheel_mass, wheel_moment)
+        self.wheel_r_body.position = default_position + config.wheel_rear_offset
         self.wheel_f_body = pymunk.Body(config.wheel_mass, wheel_moment)
+        self.wheel_f_body.position = default_position + config.wheel_front_offset
 
-        self.motor_rear = MotorController(config, self.wheel_r_body, self.chassis_body)
-        self.motor_front = MotorController(config, self.wheel_f_body, self.chassis_body)
+        self.add_suspension(space, self.wheel_r_body, config.wheel_rear_offset)
+        self.add_suspension(space, self.wheel_f_body, config.wheel_front_offset)
 
-        self.chassis_renderable = load_sprite_for_body(
-            self.chassis_body,
-            config.chassis_sprite_path,
-            pymunk.Vec2d(config.length, config.height),
-        )
-        wheel_size = pymunk.Vec2d(config.wheel_diameter, config.wheel_diameter)
-        self.wheel_r_renderable = load_sprite_for_body(
-            self.wheel_r_body, config.wheel_sprite_path, wheel_size
-        )
-        self.wheel_f_renderable = load_sprite_for_body(
-            self.wheel_f_body, config.wheel_sprite_path, wheel_size
-        )
+        self.gear_joint = pymunk.GearJoint(self.wheel_r_body, self.wheel_f_body, 0, 1.0)
+        self.motor = MotorController(config, self.wheel_r_body, self.chassis_body)
 
         chassis_s = pymunk.Poly.create_box(self.chassis_body, config.size)
         chassis_s.friction = config.body_friction
@@ -57,17 +52,30 @@ class Truck:
         wheel_f_s.friction = config.wheel_friction
         wheel_f_s.filter = pymunk.ShapeFilter(group=Truck.filter_group)
 
-        self.wheel_r_body.position = config.wheel_rear_offset
-        self.wheel_f_body.position = config.wheel_front_offset
+        space.add(
+            self.gear_joint,
+            self.chassis_body,
+            chassis_s,
+            self.wheel_r_body,
+            wheel_r_s,
+            self.wheel_f_body,
+            wheel_f_s,
+        )
 
-        self.add_suspension(space, self.wheel_r_body, config.wheel_rear_offset)
-        self.add_suspension(space, self.wheel_f_body, config.wheel_front_offset)
+        # self.init_position()
 
-        space.add(self.chassis_body, chassis_s)
-        space.add(self.wheel_r_body, wheel_r_s)
-        space.add(self.wheel_f_body, wheel_f_s)
-
-        self.init_position()
+        self.chassis_renderable = load_sprite_for_body(
+            self.chassis_body,
+            config.chassis_sprite_path,
+            config.length,
+        )
+        wheel_size = pymunk.Vec2d(config.wheel_diameter, config.wheel_diameter)
+        self.wheel_r_renderable = load_sprite_for_body(
+            self.wheel_r_body, config.wheel_sprite_path, wheel_size.x
+        )
+        self.wheel_f_renderable = load_sprite_for_body(
+            self.wheel_f_body, config.wheel_sprite_path, wheel_size.x
+        )
 
     def draw(self, screen: pygame.Surface, camera: Camera):
         draw_sprite(screen, self.chassis_renderable, camera)
@@ -75,38 +83,30 @@ class Truck:
         draw_sprite(screen, self.wheel_f_renderable, camera)
 
     def add_suspension(
-        self, space: pymunk.Space, wheel_body: pymunk.Body, chassis_offset: pymunk.Vec2d
+        self, space: pymunk.Space, wheel_body: pymunk.Body, wheel_offset: pymunk.Vec2d
     ):
-        # 1. Groove Joint (The Slider)
-        # These coordinates are LOCAL to self.chassis_body.
-        # If +Y is UP, the 'bottom' of the travel should be lower (more negative)
-        # than the 'top'.
-
-        # Let's define the rail: the wheel can slide from 0.2m above its
-        # default spot to 0.4m below it.
-        groove_top = chassis_offset + pymunk.Vec2d(0, 0.4)
-        groove_bottom = chassis_offset + pymunk.Vec2d(0, -0.8)
+        up = wheel_offset + pymunk.Vec2d(0, self.config.suspension_uptravel)
+        down = wheel_offset - pymunk.Vec2d(0, self.config.suspension_downtravel)
 
         # anchor_b is the center of the wheel (local)
         groove = pymunk.GrooveJoint(
-            self.chassis_body, wheel_body, groove_top, groove_bottom, (0, 0)
+            self.chassis_body,
+            wheel_body,
+            up,  # upper stop (body local)
+            down,  # lower stop (body local)
+            (0, 0),  # wheel center (wheel local)
         )
-
-        # 2. Damped Spring (The Shock)
-        # The spring should pull the wheel toward the 'chassis_offset'
-        stiffness = 120000.0  # High for a heavy monster truck
-        damping = 12000.0  # High to stop the 'jiggle'
-        rest_length = 0.0  # 0 means it wants the anchors to meet exactly
-
+        groove.collide_bodies = False
         spring = pymunk.DampedSpring(
             self.chassis_body,
             wheel_body,
-            chassis_offset,  # Anchor on chassis
-            (0, 0),  # Anchor on wheel center
-            rest_length,
-            stiffness,
-            damping,
+            up + pymunk.Vec2d(0, 0.2),  # chassis anchor
+            (0, 0),  # wheel center
+            abs((up - down).y),
+            self.config.suspension_spring_stiffness,
+            self.config.suspension_damping,
         )
+        spring.collide_bodies = False
 
         space.add(groove, spring)
 
@@ -136,6 +136,8 @@ class MotorController:
     def __init__(
         self, config: TruckConfig, wheel_body: pymunk.Body, chassis_body: pymunk.Body
     ):
+        self.max_speed = config.top_speed
+        self.wheel_radius = config.wheel_radius
         self.wheel_body = wheel_body
         self.chassis_body = chassis_body  # Added chassis reference
         self.wheel_torque = config.wheel_torque
@@ -161,6 +163,13 @@ class MotorController:
                 applied_torque = direction * self.braking_torque
 
         elif self.input_direction != 0:
+            # WIP - Torque limiting based on wheel speed
+            # wheel_speed = abs(self.wheel_body.angular_velocity) * self.wheel_radius
+            # lerped_torque = self.wheel_torque * (
+            #     (self.max_speed - (wheel_speed / 2)) / self.max_speed
+            # )
+
+            # applied_torque = self.input_direction * lerped_torque
             # Acceleration
             applied_torque = self.input_direction * self.wheel_torque
 

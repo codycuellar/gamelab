@@ -4,26 +4,24 @@ import pymunk
 from monster_truck.config import *
 
 
-def load_sprite_for_body(body: pymunk.Body, path: str, size_m: pymunk.Vec2d):
+def load_sprite_for_body(body: pymunk.Body, path: str, scale: float):
     """
     Loads a sprite and returns a SpriteRenderable attached to a Pymunk body.
 
     body: pymunk.Body to attach to
     path: file path to the sprite
-    size_m: physics dimensions in meters (width, height)
+    scale: physics dimensions in meters (width, height)
     """
     sprite = pygame.image.load(path).convert_alpha()
-    return SpriteRenderable(body=body, sprite=sprite, dims=size_m)
+    return SpriteRenderable(body, sprite, scale)
 
 
 class SpriteRenderable:
-    def __init__(
-        self, body: pymunk.Body, sprite: pygame.Surface, dims: tuple[float, float]
-    ):
+    def __init__(self, body: pymunk.Body, sprite: pygame.Surface, scale: float):
         self.body = body
         self.sprite = sprite
-        self.dims = dims
-        self.sprite_px_per_meter = sprite.get_size()[0] / dims[0]
+        self.scale = scale
+        self.sprite_px_per_meter = sprite.get_size()[0] / scale
 
 
 class Camera:

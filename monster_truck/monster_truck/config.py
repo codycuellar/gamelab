@@ -1,7 +1,7 @@
 import pymunk
 from dataclasses import dataclass
 
-FPS = 60.0
+FPS = 60
 
 DEFAULT_GRAVITY = (0, -9.81)  # meters / s^2
 
@@ -30,6 +30,10 @@ class TruckConfig:
     rolling_resistance: float  # coeff/sec
     wheel_torque: float  # nm
     brake_torque: float  # nm
+    suspension_uptravel: float  # meters
+    suspension_downtravel: float  # meters
+    suspension_spring_stiffness: float
+    suspension_damping: float
 
     @property
     def size(self):
@@ -58,15 +62,19 @@ TRUCKS: list[TruckConfig] = [
         height=2.0,  # meters
         mass=3500,
         body_friction=0.15,
-        top_speed=8.0,
+        top_speed=25.0,  # m/s
         wheel_radius=0.9,
-        wheel_rear_offset=pymunk.Vec2d(-4.7 / 3, -2.0 / 1.4),
-        wheel_front_offset=pymunk.Vec2d(4.7 / 3, -2.0 / 1.4),
+        wheel_rear_offset=pymunk.Vec2d(-4.7 / 3, -2.0 / 1.8),
+        wheel_front_offset=pymunk.Vec2d(4.7 / 3, -2.0 / 1.8),
         wheel_mass=600,  # two wheels on axle
-        wheel_friction=1.0,
+        wheel_friction=0.75,
         rolling_resistance=0.1,
-        wheel_torque=10000,
-        brake_torque=15000,
+        wheel_torque=40000,
+        brake_torque=45000,
+        suspension_uptravel=0.2,  # meters
+        suspension_downtravel=0.6,  # meters
+        suspension_spring_stiffness=70000.0,
+        suspension_damping=9000.0,
     ),
     # Add more trucks here...
 ]
@@ -90,6 +98,7 @@ class LevelConfig:
     vehicle_start_position: pymunk.Vec2d
     ground_friction: float
     gravity: float
+    flag: pymunk.Vec2d
 
     @property
     def geometry_filepath(self):
@@ -102,9 +111,10 @@ LEVELS: list[LevelConfig] = [
         name="Mega Mud",
         geometry_filename="level_1_geometry.png",
         geometry_px_per_meter=8,
-        vehicle_start_position=pymunk.Vec2d(100, 0),
+        vehicle_start_position=pymunk.Vec2d(100, -100),
         ground_friction=1.0,
         gravity=(0, -8.81),
+        flag=pymunk.Vec2d(3950, 230),
     ),
     # Add more levels here...
 ]

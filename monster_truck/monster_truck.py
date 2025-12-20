@@ -2,23 +2,28 @@ import math
 import sys
 import pygame
 import pymunk
+import pymunk.pygame_util
 
 from monster_truck.config import *
 from monster_truck.truck import Truck
-from monster_truck.util import Camera
+from monster_truck.util import Camera, load_sprite_for_body, draw_sprite
 from monster_truck.level import load_level_geometry
 
 pygame.init()
 
 
 def rebuild_world(
-    level_config: LevelConfig, truck_config: TruckConfig, polylines, start_pos
+    space: pymunk.Space,
+    level_config: LevelConfig,
+    truck_config: TruckConfig,
+    polylines,
+    start_pos,
 ):
     """
     Creates a fresh space and populates it using PRE-LOADED geometry.
     This is extremely fast compared to re-scanning the image.
     """
-    space = pymunk.Space()
+
     space.gravity = level_config.gravity
 
     # 1. Add segments to the new space from our cached polylines
@@ -41,6 +46,7 @@ def run_game():
     level_config = load_level_config(DEFAULT_LEVEL)
     truck_config = load_truck_config(DEFAULT_TRUCK)
 
+    space = pymunk.Space()
     screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     clock = pygame.time.Clock()
 
@@ -51,8 +57,15 @@ def run_game():
 
     # --- INITIAL PHYSICS SETUP ---
     space, truck = rebuild_world(
-        level_config, truck_config, terrain_polylines, truck_start_pos
+        space, level_config, truck_config, terrain_polylines, truck_start_pos
     )
+
+    flag_body = pymunk.Body(body_type=pymunk.Body.STATIC)
+    flag_loc = pymunk.Vec2d(530, 220)
+    flag_body.position = pymunk.Vec2d(
+        flag_loc.x / PX_PER_METER, (200 - flag_loc.y) / PX_PER_METER
+    )
+    end_flag = load_sprite_for_body(flag_body, "assets/levels/end_flag.png", 1)
 
     camera = Camera((SCREEN_W, SCREEN_H), screen_scale=PX_PER_METER)
     font = pygame.font.SysFont("Arial", 20, bold=True)
@@ -65,6 +78,15 @@ def run_game():
     display_rpm_f = 0.0
     display_rpm_r = 0.0
 
+    boundary = []
+    for polyline in terrain_polylines:
+        boundary.extend(polyline)
+
+    points_px = [camera.to_screen_coords(pt) for pt in boundary]
+
+    draw_options = pymunk.pygame_util.DrawOptions(screen)
+    draw_options.transform = pymunk.Transform(10, 0, 0, -10, 0, SCREEN_H)
+
     running = True
     while running:
         # 1. EVENT HANDLING (Use events for one-shot actions like Reset)
@@ -76,7 +98,11 @@ def run_game():
                 if e.key == pygame.K_RETURN:
                     # Instant reset using cached geometry
                     space, truck = rebuild_world(
-                        level_config, truck_config, terrain_polylines, truck_start_pos
+                        space,
+                        level_config,
+                        truck_config,
+                        terrain_polylines,
+                        truck_start_pos,
                     )
                 if e.key == pygame.K_q:
                     running = False
@@ -93,10 +119,8 @@ def run_game():
 
         is_braking = keys[pygame.K_SPACE]
 
-        truck.motor_front.update_target(input_direction, is_braking)
-        truck.motor_rear.update_target(input_direction, is_braking)
-        truck.motor_front.step(dt)
-        truck.motor_rear.step(dt)
+        truck.motor.update_target(input_direction, is_braking)
+        truck.motor.step(dt)
 
         # 3. METRICS UPDATE
         metric_timer += dt
@@ -110,6 +134,8 @@ def run_game():
 
         # 4. DRAWING
         screen.fill((174, 211, 250))
+
+        draw_sprite(screen, end_flag, camera)
 
         # Draw Terrain (from our cached polylines)
         color = (173, 144, 127)
@@ -133,6 +159,7 @@ def run_game():
             screen.blit(shadow, (22, 22 + i * 25))
             screen.blit(surf, (20, 20 + i * 25))
 
+        # space.debug_draw(draw_options)
         pygame.display.flip()
         space.step(dt)
         clock.tick(FPS)
