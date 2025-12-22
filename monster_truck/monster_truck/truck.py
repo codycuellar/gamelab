@@ -176,7 +176,10 @@ class MotorController:
         else:
             # Rolling resistance / Friction
             # We apply a small counter-torque proportional to velocity
-            applied_torque = -self.wheel_body.angular_velocity * self.rolling_resistance
+            applied_torque = math.copysign(
+                self.wheel_torque * self.rolling_resistance,
+                -self.wheel_body.angular_velocity,
+            )
 
         # --- THE KEY FIX ---
         # 1. Apply torque to the wheel
