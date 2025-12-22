@@ -2,7 +2,7 @@ import math
 import pymunk
 import pygame
 from monster_truck.config import TruckConfig
-from monster_truck.util import (
+from monster_truck.rendering_utils import (
     Camera,
     draw_sprite,
     load_sprite_for_body,
@@ -21,7 +21,7 @@ class Truck:
         wheel_moment = pymunk.moment_for_circle(
             config.wheel_mass, 0, config.wheel_radius
         )
-        truck_moment = pymunk.moment_for_box(config.mass, config.size)
+        truck_moment = pymunk.moment_for_box(config.mass, config.dimensions)
 
         self.config = config
         self.default_position = default_position
@@ -40,7 +40,7 @@ class Truck:
         self.gear_joint = pymunk.GearJoint(self.wheel_r_body, self.wheel_f_body, 0, 1.0)
         self.motor = MotorController(config, self.wheel_r_body, self.chassis_body)
 
-        chassis_s = pymunk.Poly.create_box(self.chassis_body, config.size)
+        chassis_s = pymunk.Poly.create_box(self.chassis_body, config.dimensions)
         chassis_s.friction = config.body_friction
         chassis_s.filter = pymunk.ShapeFilter(group=Truck.filter_group)
 
@@ -67,14 +67,14 @@ class Truck:
         self.chassis_renderable = load_sprite_for_body(
             self.chassis_body,
             config.chassis_sprite_path,
-            config.length,
+            pymunk.Vec2d(config.dimensions.x, config.dimensions.y),
         )
         wheel_size = pymunk.Vec2d(config.wheel_diameter, config.wheel_diameter)
         self.wheel_r_renderable = load_sprite_for_body(
-            self.wheel_r_body, config.wheel_sprite_path, wheel_size.x
+            self.wheel_r_body, config.wheel_sprite_path, wheel_size
         )
         self.wheel_f_renderable = load_sprite_for_body(
-            self.wheel_f_body, config.wheel_sprite_path, wheel_size.x
+            self.wheel_f_body, config.wheel_sprite_path, wheel_size
         )
 
     def draw(self, screen: pygame.Surface, camera: Camera):

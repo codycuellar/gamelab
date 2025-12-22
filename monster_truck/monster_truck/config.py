@@ -6,7 +6,7 @@ FPS = 60
 DEFAULT_GRAVITY = (0, -9.81)  # meters / s^2
 
 # ---------- Screen / Scale ----------
-PX_PER_METER = 30  # how many pixels equal 1 meter
+PX_PER_METER = 20  # how many pixels equal 1 meter
 SCREEN_W = 2048  # ~34m
 SCREEN_H = 1200  # ~20m
 
@@ -36,8 +36,8 @@ class TruckConfig:
     suspension_damping: float
 
     @property
-    def size(self):
-        return (self.length, self.height)
+    def dimensions(self):
+        return pymunk.Vec2d(self.length, self.height)
 
     @property
     def wheel_diameter(self):
@@ -69,8 +69,8 @@ TRUCKS: list[TruckConfig] = [
         wheel_mass=600,  # two wheels on axle
         wheel_friction=0.75,
         rolling_resistance=0.1,
-        wheel_torque=30000,
-        brake_torque=45000,
+        wheel_torque=22000,
+        brake_torque=35000,
         suspension_uptravel=0.2,  # meters
         suspension_downtravel=0.6,  # meters
         suspension_spring_stiffness=70000.0,
@@ -94,11 +94,10 @@ def load_truck_config(name: str) -> TruckConfig:
 class LevelConfig:
     name: str
     geometry_filename: str
-    geometry_px_per_meter: int
-    vehicle_start_position: pymunk.Vec2d
+    units_per_meter: int
+    samples_per_meter: int
     ground_friction: float
     gravity: float
-    flag: pymunk.Vec2d
 
     @property
     def geometry_filepath(self):
@@ -109,12 +108,11 @@ class LevelConfig:
 LEVELS: list[LevelConfig] = [
     LevelConfig(
         name="Mega Mud",
-        geometry_filename="level_1_geometry.png",
-        geometry_px_per_meter=8,
-        vehicle_start_position=pymunk.Vec2d(100, -100),
+        geometry_filename="level_1.svg",
+        units_per_meter=5,
+        samples_per_meter=2,
         ground_friction=1.0,
         gravity=(0, -8.81),
-        flag=pymunk.Vec2d(3950, 230),
     ),
     # Add more levels here...
 ]

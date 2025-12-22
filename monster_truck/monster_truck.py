@@ -6,8 +6,8 @@ import pymunk.pygame_util
 
 from monster_truck.config import *
 from monster_truck.truck import Truck
-from monster_truck.util import Camera, load_sprite_for_body, draw_sprite
-from monster_truck.level import load_level_geometry
+from monster_truck.rendering_utils import Camera
+from monster_truck.level_utils import load_level_geometry
 
 pygame.init()
 
@@ -27,11 +27,10 @@ def rebuild_world(
     space.gravity = level_config.gravity
 
     # 1. Add segments to the new space from our cached polylines
-    for polyline in polylines:
-        for p1, p2 in zip(polyline, polyline[1:]):
-            seg = pymunk.Segment(space.static_body, p1, p2, 0.2)
-            seg.friction = level_config.ground_friction
-            space.add(seg)
+    for p1, p2 in zip(polylines, polylines[1:]):
+        seg = pymunk.Segment(space.static_body, p1, p2, 0.2)
+        seg.friction = level_config.ground_friction
+        space.add(seg)
 
     # 2. Re-init the truck in the new space
     truck = Truck(truck_config, space, start_pos)
@@ -53,11 +52,12 @@ def run_game():
     # --- ONE TIME HEAVY LIFTING ---
     # We create a dummy space just to extract the geometry once
     temp_space = pymunk.Space()
-    terrain_polylines, truck_start_pos = load_level_geometry(level_config, temp_space)
+    terrain_polylines = load_level_geometry(level_config, temp_space)
+    truck_starting_pos = pymunk.Vec2d(45, -50)
 
     # --- INITIAL PHYSICS SETUP ---
     space, truck = rebuild_world(
-        space, level_config, truck_config, terrain_polylines, truck_start_pos
+        space, level_config, truck_config, terrain_polylines, truck_starting_pos
     )
 
     flag_body = pymunk.Body(body_type=pymunk.Body.STATIC)
@@ -65,7 +65,6 @@ def run_game():
     flag_body.position = pymunk.Vec2d(
         flag_loc.x / PX_PER_METER, (200 - flag_loc.y) / PX_PER_METER
     )
-    end_flag = load_sprite_for_body(flag_body, "assets/levels/end_flag.png", 1)
 
     camera = Camera((SCREEN_W, SCREEN_H), screen_scale=PX_PER_METER)
     font = pygame.font.SysFont("Arial", 20, bold=True)
@@ -77,12 +76,6 @@ def run_game():
     display_speed = 0.0
     display_rpm_f = 0.0
     display_rpm_r = 0.0
-
-    boundary = []
-    for polyline in terrain_polylines:
-        boundary.extend(polyline)
-
-    points_px = [camera.to_screen_coords(pt) for pt in boundary]
 
     draw_options = pymunk.pygame_util.DrawOptions(screen)
     draw_options.transform = pymunk.Transform(10, 0, 0, -10, 0, SCREEN_H)
@@ -102,7 +95,7 @@ def run_game():
                         level_config,
                         truck_config,
                         terrain_polylines,
-                        truck_start_pos,
+                        truck_starting_pos,
                     )
                 if e.key == pygame.K_q:
                     running = False
@@ -135,14 +128,13 @@ def run_game():
         # 4. DRAWING
         screen.fill((174, 211, 250))
 
-        draw_sprite(screen, end_flag, camera)
+        # draw_sprite(screen, end_flag, camera)
 
         # Draw Terrain (from our cached polylines)
         color = (173, 144, 127)
-        for polyline in terrain_polylines:
-            if len(polyline) >= 2:
-                points_px = [camera.to_screen_coords(pt) for pt in polyline]
-                pygame.draw.lines(screen, color, False, points_px, 3)
+        if len(terrain_polylines) >= 2:
+            points_px = [camera.to_screen_coords(pt) for pt in terrain_polylines]
+            pygame.draw.lines(screen, color, False, points_px, 3)
 
         truck.draw(screen, camera)
 
