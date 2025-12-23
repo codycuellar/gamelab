@@ -1,58 +1,132 @@
 from xml.dom import minidom
 
-import pymunk
+from pymunk import Vec2d, Space, Segment
 from svg.path import parse_path, Move, CubicBezier, Line
 
 from monster_truck.config import *
 
 
-def load_svg_terrain(
-    terrain_filepath: str, svg_units_to_meters: float, samples_per_meter: int
+def load_svg(filepath: str):
+    """
+    Load a filepath, and parse the SVG paths command strings.
+
+    :param filepath:
+        The path to the SVG file.
+    :returns:
+        The path command strings. This is an array of N paths
+        for each non-contiguous path shape in the SVG file.
+    """
+    doc = minidom.parse(filepath)
+    return [path.getAttribute("d") for path in doc.getElementsByTagName("path")]
+
+
+def sample_paths(
+    paths: list[str],
+    level_to_world_units: float,
+    samples_per_world_unit: int,
 ):
-    doc = minidom.parse(terrain_filepath)
-    path_strings = [path.getAttribute("d") for path in doc.getElementsByTagName("path")]
-    cmds = parse_path(path_strings[0])
-    points: list[pymunk.Vec2d] = []
+    """
+    Sample SVG path strings into lerped coordinates. This will approximate
+    the curves length and take N number of samples to get close to the target
+    samples_per_world_unit. Currently we only support one contiguous vector,
+    so only the first path will be parsed and converted to points.
+
+    :param paths:
+        The array of individual path strings to sample.
+    :param level_to_world_units:
+        The number of input file units per world unit. For instance, if 10
+        pixels in the level design dimensions is meant to represent 1 world
+        meter, this value would be 10, and we would divide all realtive point
+        values by 10.
+    :param samples_per_world_unit:
+        Once converted to world units, such as meters, this determines how
+        many samples to take between two curve endpoints to approximate
+        this value. So a value of 1 here will take 10 sample points if the
+        approximate length of the curve is 10 world units.
+    """
+    # currently we only support a single contiguous vector path.
+    cmds = parse_path(paths[0])
+    points: list[Vec2d] = []
 
     def add_point(pt: complex):
         points.append(
-            level_px_to_world_pos(pymunk.Vec2d(pt.real, pt.imag), svg_units_to_meters)
+            level_units_to_world(Vec2d(pt.real, pt.imag), level_to_world_units)
         )
 
+    # Iterate the point commands. Each iteration we add all the points up to the endpoint,
+    # so on subsequent calls, we don't add the start point as it was already captured in the
+    # previous iteration.
     for cmd in cmds:
         if isinstance(cmd, Move):
-            # Moves are generally the first point.
+            # Moves are generally the first point, if we want to support noncontiguous ground
+            # surfaces, we'll need to create a list of lists, and add new parent lists anytime
+            # we get to a new move command.
             add_point(cmd.point(1.0))
         elif isinstance(cmd, Line):
+            # Add the endpoint for straight line segments.
             add_point(cmd.end)
         elif isinstance(cmd, CubicBezier):
+            # here we get the previous point, the next two control points and the end point
+            # to lerp the cubic bez. We'll approximate the segment length to determine how many
+            # points to sample based on our samples_per_world_unit.
             length = (
                 abs(cmd.start - cmd.control1)
                 + abs(cmd.control1 - cmd.control2)
                 + abs(cmd.control2 - cmd.end)
-            ) / svg_units_to_meters
-            num_samples = max(2, int(length * samples_per_meter))
+            ) / level_to_world_units
+            num_samples = max(2, int(length * samples_per_world_unit))
+            # skip 0 since that's the start point added in the last loop
             for t in range(1, num_samples):
                 t /= num_samples
                 add_point(cmd.point(t))
     return points
 
 
-def level_px_to_world_pos(loc: pymunk.Vec2d, pix_per_meter: int):
-    return pymunk.Vec2d(loc.x, -loc.y) / pix_per_meter
+def level_units_to_world(position: Vec2d, level_to_world_units: float):
+    """
+    Convert coordinates in level design space to world relative units. This
+    scales the values and flips the Y-axis, since input files are +Y down, and
+    physics world is +Y up.
+
+    :param position:
+        The position vector to convert.
+    :param level_to_world_units:
+        The number of relative level design units per one world unit.
+    """
+    return Vec2d(position.x, -position.y) / level_to_world_units
 
 
-def load_level_geometry(
-    space: pymunk.Space,
+def load_level_geometry_from_svg(
+    space: Space,
     filepath: str,
     level_units_to_world: float,
     samples_per_world_unit: float,
     friction: float,
 ):
-    points = load_svg_terrain(filepath, level_units_to_world, samples_per_world_unit)
+    """
+    Load an SVG and sample it into world relative coordiantes. It then adds
+    individual segments between each sampled point into the physics engine.
+
+    :param space:
+        The physics space to add the sampled segments to.
+    :param filepath:
+        The SVG file to load.
+    :param level_units_to_world:
+        The number of level document relative units per world unit.
+    :param samples_per_world_unit:
+        The target approximate distance for each sampled point in world
+        relative units.
+    :param friction:
+        The friction coefficient of the terrain geometry.
+    :returns:
+        The raw sampled points as world relative coordinates.
+    """
+    paths = load_svg(filepath)
+    # load the SVG and lerp the points based on samples_per_world_unit
+    points = sample_paths(paths, level_units_to_world, samples_per_world_unit)
     # add points to physcics Space
     for p1, p2 in zip(points, points[1:]):
-        seg = pymunk.Segment(space.static_body, p1, p2, 0.2)
+        seg = Segment(space.static_body, p1, p2, 0.2)
         seg.friction = friction
         space.add(seg)
     return points
