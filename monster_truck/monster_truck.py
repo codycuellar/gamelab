@@ -7,67 +7,55 @@ import pymunk.pygame_util
 from monster_truck.config import *
 from monster_truck.truck import Truck
 from monster_truck.rendering_utils import Camera
-from monster_truck.level_utils import load_level_geometry
+from monster_truck.level_utils import load_level_geometry, level_px_to_world_pos
 
 pygame.init()
 
 
 def rebuild_world(
-    space: pymunk.Space,
     level_config: LevelConfig,
     truck_config: TruckConfig,
-    polylines,
-    start_pos,
 ):
     """
     Creates a fresh space and populates it using PRE-LOADED geometry.
     This is extremely fast compared to re-scanning the image.
     """
-
+    space = pymunk.Space()
     space.gravity = level_config.gravity
+    terrain_points = load_level_geometry(
+        space,
+        level_config.geometry_path,
+        level_config.units_per_meter,
+        level_config.samples_per_meter,
+        level_config.ground_friction,
+    )
 
-    # 1. Add segments to the new space from our cached polylines
-    for p1, p2 in zip(polylines, polylines[1:]):
-        seg = pymunk.Segment(space.static_body, p1, p2, 0.2)
-        seg.friction = level_config.ground_friction
-        space.add(seg)
-
-    # 2. Re-init the truck in the new space
-    truck = Truck(truck_config, space, start_pos)
-
-    return space, truck
+    truck = Truck(
+        truck_config,
+        space,
+        level_px_to_world_pos(
+            level_config.start_position, level_config.units_per_meter
+        ),
+    )
+    return space, terrain_points, truck
 
 
 def run_game():
     dt = 1.0 / FPS
 
     # Load configurations
-    level_config = load_level_config(DEFAULT_LEVEL)
-    truck_config = load_truck_config(DEFAULT_TRUCK)
+    current_level_config = load_level_config()
+    current_truck_config = load_truck_config()
 
-    space = pymunk.Space()
     screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     clock = pygame.time.Clock()
 
-    # --- ONE TIME HEAVY LIFTING ---
-    # We create a dummy space just to extract the geometry once
-    temp_space = pymunk.Space()
-    terrain_polylines = load_level_geometry(level_config, temp_space)
-    truck_starting_pos = pymunk.Vec2d(45, -50)
-
-    # --- INITIAL PHYSICS SETUP ---
-    space, truck = rebuild_world(
-        space, level_config, truck_config, terrain_polylines, truck_starting_pos
-    )
-
-    flag_body = pymunk.Body(body_type=pymunk.Body.STATIC)
-    flag_loc = pymunk.Vec2d(530, 220)
-    flag_body.position = pymunk.Vec2d(
-        flag_loc.x / PX_PER_METER, (200 - flag_loc.y) / PX_PER_METER
-    )
-
     camera = Camera((SCREEN_W, SCREEN_H), screen_scale=PX_PER_METER)
     font = pygame.font.SysFont("Arial", 20, bold=True)
+
+    space, terrain_points, truck = rebuild_world(
+        current_level_config, current_truck_config
+    )
 
     # HUD Tracking
     metric_timer = 0.0
@@ -77,8 +65,8 @@ def run_game():
     display_rpm_f = 0.0
     display_rpm_r = 0.0
 
-    draw_options = pymunk.pygame_util.DrawOptions(screen)
-    draw_options.transform = pymunk.Transform(10, 0, 0, -10, 0, SCREEN_H)
+    # draw_options = pymunk.pygame_util.DrawOptions(screen)
+    # draw_options.transform = pymunk.Transform(10, 0, 0, -10, 0, SCREEN_H)
 
     running = True
     while running:
@@ -90,12 +78,8 @@ def run_game():
             if e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_RETURN:
                     # Instant reset using cached geometry
-                    space, truck = rebuild_world(
-                        space,
-                        level_config,
-                        truck_config,
-                        terrain_polylines,
-                        truck_starting_pos,
+                    space, terrain_points, truck = rebuild_world(
+                        current_level_config, current_truck_config
                     )
                 if e.key == pygame.K_q:
                     running = False
@@ -110,9 +94,7 @@ def run_game():
         elif keys[pygame.K_LEFT]:
             input_direction = 1
 
-        is_braking = keys[pygame.K_SPACE]
-
-        truck.motor.update_target(input_direction, is_braking)
+        truck.motor.update_target(input_direction, keys[pygame.K_SPACE])
         truck.motor.step(dt)
 
         # 3. METRICS UPDATE
@@ -120,20 +102,18 @@ def run_game():
         if metric_timer >= update_interval:
             display_speed = truck.chassis_body.velocity.length
             rad_to_rpm = 60 / (2 * math.pi)
-            display_rpm_f = -truck.wheel_f_body.angular_velocity * rad_to_rpm
-            display_rpm_r = -truck.wheel_r_body.angular_velocity * rad_to_rpm
+            display_rpm_f = -truck.wheel_front_body.angular_velocity * rad_to_rpm
+            display_rpm_r = -truck.wheel_rear_body.angular_velocity * rad_to_rpm
             display_fps = clock.get_fps()
             metric_timer = 0.0
 
         # 4. DRAWING
         screen.fill((174, 211, 250))
 
-        # draw_sprite(screen, end_flag, camera)
-
         # Draw Terrain (from our cached polylines)
         color = (173, 144, 127)
-        if len(terrain_polylines) >= 2:
-            points_px = [camera.to_screen_coords(pt) for pt in terrain_polylines]
+        if len(terrain_points) >= 2:
+            points_px = [camera.to_screen_coords(pt) for pt in terrain_points]
             pygame.draw.lines(screen, color, False, points_px, 3)
 
         truck.draw(screen, camera)
