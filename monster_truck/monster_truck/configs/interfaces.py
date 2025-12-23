@@ -93,7 +93,7 @@ class TruckConfig:
     Configuration for an entire truck.
 
     Attributes:
-        name: The name of the truck.
+        name: The name of the truck. to appear in the truck selector.
         chassis: The chassis config.
         wheel_rear: The rear wheel config.
         wheel_front:
@@ -101,28 +101,51 @@ class TruckConfig:
             since the driveline is 4WD.
         top_speed: (m/s) The target top speed of the truck.
         rolling_resistance: (coeff) A coefficient of angular velocity to
-        torque: float  # nm
-        brake_torque: float  # nm
+        torque:
+            (Nm) The amount of torque applied to each axle. Since the two axles
+            are geared together they will both always receive the same torque.
+        brake_torque: (Nm) The amount of braking force torque.
     """
 
     name: str
-
     chassis: ChassisConfig
     wheel_rear: WheelConfig
     wheel_front: WheelConfig
-
-    top_speed: float  # m/s
-    rolling_resistance: float  # coeff/sec
-
-    torque: float  # nm
-    brake_torque: float  # nm
+    top_speed: float
+    rolling_resistance: float
+    torque: float
+    brake_torque: float
 
 
 # ---------- Level Config Classes ----------
+# TODO: Things like ground friction and gravity should be an array of tuples
+# such as (start, end, gravity), or (start, end, color, friciton) for properties
+# that we want to be able to specify more isolated world sections with different
+# frictions or gravities.
 @dataclass
 class LevelConfig:
+    """
+    The config for a single level.
+
+    Attributes:
+        name: The name of the level to appear in the level selector.
+        svg_path: The path to the svg file defining the level geometry.
+        units_per_meter:
+            The number of SVG document relative units per world meter.
+        samples_per_meter:
+            The target number of samples to take when lerping the terrain points
+            in meters.
+        ground_friction: (coeff) The friction coefficient of the ground.
+        gravity: (m/s^2) The world gravity.
+        start_position:
+            The level SVG relative x/y coordinates to start the truck on.
+        finish_line:
+            The level SVG relative x coordinate the truck must pass to complete
+            the level.
+    """
+
     name: str
-    geometry_path: str
+    svg_path: str
     units_per_meter: int
     samples_per_meter: int
     ground_friction: float

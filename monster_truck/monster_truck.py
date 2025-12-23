@@ -23,7 +23,7 @@ def rebuild_world(
     space.gravity = level_config.gravity
     terrain_points = load_level_geometry_from_svg(
         space,
-        level_config.geometry_path,
+        level_config.svg_path,
         level_config.units_per_meter,
         level_config.samples_per_meter,
         level_config.ground_friction,

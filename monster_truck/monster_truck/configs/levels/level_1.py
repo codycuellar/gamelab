@@ -5,7 +5,7 @@ from monster_truck.configs.interfaces import LevelConfig
 
 CONFIG = LevelConfig(
     name="Mega Mud",
-    geometry_path="assets/levels/level_1.svg",
+    svg_path="assets/levels/level_1.svg",
     units_per_meter=5,
     samples_per_meter=2,
     ground_friction=1.0,
