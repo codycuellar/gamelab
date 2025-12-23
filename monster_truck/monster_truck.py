@@ -2,7 +2,6 @@ import math
 import sys
 import pygame
 import pymunk
-import pymunk.pygame_util
 
 from monster_truck.config import *
 from monster_truck.truck import Truck

@@ -117,27 +117,6 @@ class Truck:
 
         self.space.add(groove, spring)
 
-    # def init_position(self):
-    #     """Move the truck to a new base position and reset velocities."""
-    #     # Compute current bottom-left of the whole truck
-    #     bb_min = pymunk.Vec2d(float("inf"), float("inf"))
-
-    #     for body in (self.chassis_body, self.wheel_rear_body, self.wheel_front_body):
-    #         for shape in body.shapes:
-    #             bb_min = pymunk.Vec2d(
-    #                 min(bb_min.x, shape.bb.left), min(bb_min.y, shape.bb.bottom)
-    #             )
-
-    #     # Desired bottom-left position (world meters)
-    #     target_bl = self.default_position
-
-    #     # How far we need to move the whole truck
-    #     delta = target_bl - bb_min
-
-    #     # Move EVERYTHING by the same delta
-    #     for body in (self.chassis_body, self.wheel_rear_body, self.wheel_front_body):
-    #         body.position += delta
-
 
 class MotorController:
     def __init__(
@@ -145,7 +124,7 @@ class MotorController:
     ):
         self.max_speed = config.top_speed
         self.wheel_body = wheel_body
-        self.chassis_body = chassis_body  # Added chassis reference
+        self.chassis_body = chassis_body
         self.wheel_torque = config.torque
         self.braking_torque = config.brake_torque
         self.rolling_resistance = config.rolling_resistance
@@ -168,30 +147,21 @@ class MotorController:
                 applied_torque = direction * self.braking_torque
 
         elif self.input_direction != 0:
-            # WIP - Torque limiting based on wheel speed
-            # wheel_speed = abs(self.wheel_body.angular_velocity) * self.wheel_radius
-            # lerped_torque = self.wheel_torque * (
-            #     (self.max_speed - (wheel_speed / 2)) / self.max_speed
-            # )
-
-            # applied_torque = self.input_direction * lerped_torque
             # Acceleration
             applied_torque = self.input_direction * self.wheel_torque
 
         else:
             # Rolling resistance / Friction
-            # We apply a small counter-torque proportional to velocity.
-            # currently this applies in both ground and airborn conditions
-            # the same.
+            # We apply a small counter-torque proportional to velocity to simulate rolling
+            # resistance, but this also gradually slows wheels mid-air when throttle is not
+            # applied, and could be improvbed.
             applied_torque = math.copysign(
                 self.wheel_torque * self.rolling_resistance,
                 -self.wheel_body.angular_velocity,
             )
 
-        # --- THE KEY FIX ---
         # 1. Apply torque to the wheel
         self.wheel_body.torque += applied_torque
 
-        # 2. Apply EQUAL AND OPPOSITE torque to the chassis
-        # This creates the "lift" or "squat" effect
+        # apply inverse torque of wheel to body (allows in-air rotation and wheelies)
         self.chassis_body.torque -= applied_torque
