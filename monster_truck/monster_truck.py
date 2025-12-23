@@ -11,9 +11,8 @@ from monster_truck.level_utils import load_level_geometry_from_svg, level_units_
 pygame.init()
 
 
-def rebuild_world(
-    level_config: LevelConfig,
-    truck_config: TruckConfig,
+def init_world(
+    level_config: LevelConfig, truck_config: TruckConfig, start_position: pymunk.Vec2d
 ):
     """
     Creates a fresh space and populates it using PRE-LOADED geometry.
@@ -29,27 +28,40 @@ def rebuild_world(
         level_config.ground_friction,
     )
 
-    truck = Truck(
-        truck_config,
-        space,
-        level_units_to_world(level_config.start_position, level_config.units_per_meter),
-    )
+    truck = Truck(truck_config, space, start_position)
     return space, terrain_points, truck
+
+
+def print_time(t: float):
+    minutes = int(t // 60)
+    seconds = int(t % 60)
+    return f"{minutes}:{seconds:02d}"
 
 
 def run_game():
     # Load configurations
     current_level_config = load_level_config()
     current_truck_config = load_truck_config()
+    f_coord = current_level_config.finish_line
+    finish_line = level_units_to_world(
+        pymunk.Vec2d(f_coord, f_coord), current_level_config.units_per_meter
+    ).x
 
     screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     clock = pygame.time.Clock()
 
     camera = Camera((SCREEN_W, SCREEN_H), screen_scale=PX_PER_METER)
-    font = pygame.font.SysFont("Arial", 20, bold=True)
 
-    space, terrain_points, truck = rebuild_world(
-        current_level_config, current_truck_config
+    menu_font = pygame.font.SysFont("Arial", 20, bold=True)
+    menu_bg_color = (220, 247, 247)
+    menu_font_color = (125, 97, 95)
+
+    space, terrain_points, truck = init_world(
+        current_level_config,
+        current_truck_config,
+        level_units_to_world(
+            current_level_config.start_position, current_level_config.units_per_meter
+        ),
     )
 
     # HUD Tracking
@@ -60,27 +72,83 @@ def run_game():
     display_rpm_f = 0.0
     display_rpm_r = 0.0
 
-    # draw_options = pymunk.pygame_util.DrawOptions(screen)
-    # draw_options.transform = pymunk.Transform(10, 0, 0, -10, 0, SCREEN_H)
+    level_time = 0
+    game_start = True
+    game_over = False
+
+    menu_font = pygame.font.SysFont("Impact", 25)
 
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
         space.step(dt)
 
-        # 1. EVENT HANDLING (Use events for one-shot actions like Reset)
-        for e in pygame.event.get():
+        events = pygame.event.get()
+        for e in events:
             if e.type == pygame.QUIT:
                 running = False
 
+        if game_start:
+            for e in events:
+                if e.type == pygame.KEYDOWN:
+                    if e.key == pygame.K_SPACE:
+                        game_start = False
+
+            screen.fill(menu_bg_color)
+            text = menu_font.render(
+                f"Press spacebar to start the game!",
+                True,
+                menu_font_color,
+            )
+            text_rect = text.get_rect(center=(SCREEN_W // 2, SCREEN_H // 2))
+            screen.blit(text, text_rect)
+            pygame.display.flip()
+            continue
+
+        if game_over:
+            for e in events:
+                if e.type == pygame.KEYDOWN:
+                    if e.key == pygame.K_SPACE:
+                        game_over = False
+                        level_time = 0
+                        space, terrain_points, truck = init_world(
+                            current_level_config,
+                            current_truck_config,
+                            level_units_to_world(
+                                current_level_config.start_position,
+                                current_level_config.units_per_meter,
+                            ),
+                        )
+
+            screen.fill(menu_bg_color)
+            text = menu_font.render(
+                f"Level Complete! Your time: {print_time(level_time)}",
+                True,
+                menu_font_color,
+            )
+            text_rect = text.get_rect(center=(SCREEN_W // 2, SCREEN_H // 2))
+            screen.blit(text, text_rect)
+
+            text = menu_font.render(
+                f"Press spacebar to try again!", True, menu_font_color
+            )
+            text_rect = text.get_rect(center=(SCREEN_W // 2, SCREEN_H // 2 + 30))
+            screen.blit(text, text_rect)
+            pygame.display.flip()
+            continue
+
+        level_time += dt
+
+        # 1. EVENT HANDLING (Use events for one-shot actions like Reset)
+        for e in events:
             if e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_RETURN:
                     # Instant reset using cached geometry
-                    space, terrain_points, truck = rebuild_world(
-                        current_level_config, current_truck_config
+                    space, terrain_points, truck = init_world(
+                        current_level_config,
+                        current_truck_config,
+                        truck.chassis_body.position + pymunk.Vec2d(0, 2),
                     )
-                if e.key == pygame.K_q:
-                    running = False
 
         # 2. INPUT & PHYSICS
         keys = pygame.key.get_pressed()
@@ -94,6 +162,12 @@ def run_game():
 
         truck.motor.update_target(input_direction, keys[pygame.K_SPACE])
         truck.motor.step()
+
+        for body in [truck.chassis_body, truck.wheel_rear_body, truck.wheel_front_body]:
+            for shape in body.shapes:
+                bb = shape.bb
+                if bb.left <= finish_line <= bb.right:
+                    game_over = True
 
         # 3. METRICS UPDATE
         metric_timer += dt
@@ -124,8 +198,8 @@ def run_game():
             f"Rear RPM: {int(display_rpm_r)}",
         ]
         for i, text in enumerate(metrics):
-            shadow = font.render(text, True, (255, 255, 255))
-            surf = font.render(text, True, (0, 0, 0))
+            shadow = menu_font.render(text, True, (255, 255, 255))
+            surf = menu_font.render(text, True, (0, 0, 0))
             screen.blit(shadow, (22, 22 + i * 25))
             screen.blit(surf, (20, 20 + i * 25))
 
