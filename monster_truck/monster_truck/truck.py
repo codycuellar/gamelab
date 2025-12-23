@@ -136,7 +136,7 @@ class MotorController:
         self.input_direction = direction
         self.is_braking = braking
 
-    def step(self, dt: float):
+    def step(self):
         # Reset torque from previous step to avoid accumulation
         applied_torque = 0.0
 

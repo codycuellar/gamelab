@@ -6,7 +6,7 @@ import pymunk
 from monster_truck.config import *
 from monster_truck.truck import Truck
 from monster_truck.rendering_utils import Camera
-from monster_truck.level_utils import load_level_geometry, level_px_to_world_pos
+from monster_truck.level_utils import load_level_geometry_from_svg, level_units_to_world
 
 pygame.init()
 
@@ -21,7 +21,7 @@ def rebuild_world(
     """
     space = pymunk.Space()
     space.gravity = level_config.gravity
-    terrain_points = load_level_geometry(
+    terrain_points = load_level_geometry_from_svg(
         space,
         level_config.geometry_path,
         level_config.units_per_meter,
@@ -32,16 +32,12 @@ def rebuild_world(
     truck = Truck(
         truck_config,
         space,
-        level_px_to_world_pos(
-            level_config.start_position, level_config.units_per_meter
-        ),
+        level_units_to_world(level_config.start_position, level_config.units_per_meter),
     )
     return space, terrain_points, truck
 
 
 def run_game():
-    dt = 1.0 / FPS
-
     # Load configurations
     current_level_config = load_level_config()
     current_truck_config = load_truck_config()
@@ -69,6 +65,9 @@ def run_game():
 
     running = True
     while running:
+        dt = clock.tick(FPS) / 1000.0
+        space.step(dt)
+
         # 1. EVENT HANDLING (Use events for one-shot actions like Reset)
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
@@ -94,7 +93,7 @@ def run_game():
             input_direction = 1
 
         truck.motor.update_target(input_direction, keys[pygame.K_SPACE])
-        truck.motor.step(dt)
+        truck.motor.step()
 
         # 3. METRICS UPDATE
         metric_timer += dt
@@ -132,8 +131,6 @@ def run_game():
 
         # space.debug_draw(draw_options)
         pygame.display.flip()
-        space.step(dt)
-        clock.tick(FPS)
 
 
 if __name__ == "__main__":

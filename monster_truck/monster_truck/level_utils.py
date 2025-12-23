@@ -10,9 +10,10 @@ def load_svg(filepath: str):
     """
     Load a filepath, and parse the SVG paths command strings.
 
-    :param filepath:
-        The path to the SVG file.
-    :returns:
+    Args:
+        filepath:  The path to the SVG file.
+
+    Returns:
         The path command strings. This is an array of N paths
         for each non-contiguous path shape in the SVG file.
     """
@@ -31,18 +32,21 @@ def sample_paths(
     samples_per_world_unit. Currently we only support one contiguous vector,
     so only the first path will be parsed and converted to points.
 
-    :param paths:
-        The array of individual path strings to sample.
-    :param level_to_world_units:
-        The number of input file units per world unit. For instance, if 10
-        pixels in the level design dimensions is meant to represent 1 world
-        meter, this value would be 10, and we would divide all realtive point
-        values by 10.
-    :param samples_per_world_unit:
-        Once converted to world units, such as meters, this determines how
-        many samples to take between two curve endpoints to approximate
-        this value. So a value of 1 here will take 10 sample points if the
-        approximate length of the curve is 10 world units.
+    Args:
+        paths: The array of individual path strings to sample.
+        level_to_world_units:
+            The number of input file units per world unit. For instance, if 10
+            pixels in the level design dimensions is meant to represent 1 world
+            meter, this value would be 10, and we would divide all realtive point
+            values by 10.
+        samples_per_world_unit:
+            Once converted to world units, such as meters, this determines how
+            many samples to take between two curve endpoints to approximate
+            this value. So a value of 1 here will take 10 sample points if the
+            approximate length of the curve is 10 world units.
+
+    Returns:
+        The array of sampled points in world-relative units.
     """
     # currently we only support a single contiguous vector path.
     cmds = parse_path(paths[0])
@@ -88,10 +92,13 @@ def level_units_to_world(position: Vec2d, level_to_world_units: float):
     scales the values and flips the Y-axis, since input files are +Y down, and
     physics world is +Y up.
 
-    :param position:
-        The position vector to convert.
-    :param level_to_world_units:
-        The number of relative level design units per one world unit.
+    Args:
+        position: The position vector to convert.
+        level_to_world_units:
+            The number of relative level design units per one world unit.
+
+    Returns:
+        The converted world relative position.
     """
     return Vec2d(position.x, -position.y) / level_to_world_units
 
@@ -107,18 +114,17 @@ def load_level_geometry_from_svg(
     Load an SVG and sample it into world relative coordiantes. It then adds
     individual segments between each sampled point into the physics engine.
 
-    :param space:
-        The physics space to add the sampled segments to.
-    :param filepath:
-        The SVG file to load.
-    :param level_units_to_world:
-        The number of level document relative units per world unit.
-    :param samples_per_world_unit:
-        The target approximate distance for each sampled point in world
-        relative units.
-    :param friction:
-        The friction coefficient of the terrain geometry.
-    :returns:
+    Args:
+        space: The physics space to add the sampled segments to.
+        filepath: The SVG file to load.
+        level_units_to_world:
+            The number of level document relative units per world unit.
+        samples_per_world_unit:
+            The target approximate distance for each sampled point in world
+            relative units.
+        friction: The friction coefficient of the terrain geometry.
+
+    Returns:
         The raw sampled points as world relative coordinates.
     """
     paths = load_svg(filepath)

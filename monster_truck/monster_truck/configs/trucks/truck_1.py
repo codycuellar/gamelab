@@ -9,6 +9,12 @@ from monster_truck.configs.interfaces import (
     SuspensionConfig,
 )
 
+CHASSIS = ChassisConfig(
+    sprite_path="assets/trucks/truck_1_body.png",
+    dimensions=Vec2d(4.7, 2.0),
+    mass=3500,
+    friction=0.15,
+)
 
 SUSPENSION = SuspensionConfig(
     uptravel=0.2,
@@ -22,19 +28,13 @@ WHEEL_R = WheelConfig(
     radius=0.9,
     mass=600,
     friction=0.75,
-    offset=Vec2d(-4.7 / 3, -2.0 / 1.8),
+    offset=Vec2d(-CHASSIS.dimensions.x / 3, -CHASSIS.dimensions.y / 1.8),
     suspension=SUSPENSION,
 )
 
 WHEEL_F = copy.deepcopy(WHEEL_R)
-WHEEL_F.offset = Vec2d(4.7 / 3, -2.0 / 1.8)
+WHEEL_F.offset = Vec2d(CHASSIS.dimensions.x / 3, -CHASSIS.dimensions.y / 1.8)
 
-CHASSIS = ChassisConfig(
-    sprite_path="assets/trucks/truck_1_body.png",
-    dimensions=Vec2d(4.7, 2.0),
-    mass=3500,
-    friction=0.15,
-)
 
 CONFIG = TruckConfig(
     name="Truck 1",
