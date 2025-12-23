@@ -35,13 +35,17 @@ def init_world(
 def print_time(t: float):
     minutes = int(t // 60)
     seconds = int(t % 60)
-    return f"{minutes}:{seconds:02d}"
+    return f"{minutes:02d}:{seconds:02d}"
 
 
 def run_game():
     # Load configurations
     current_level_config = load_level_config()
     current_truck_config = load_truck_config()
+
+    default_start_position = level_units_to_world(
+        current_level_config.start_position, current_level_config.units_per_meter
+    )
     f_coord = current_level_config.finish_line
     finish_line = level_units_to_world(
         pymunk.Vec2d(f_coord, f_coord), current_level_config.units_per_meter
@@ -59,9 +63,7 @@ def run_game():
     space, terrain_points, truck = init_world(
         current_level_config,
         current_truck_config,
-        level_units_to_world(
-            current_level_config.start_position, current_level_config.units_per_meter
-        ),
+        default_start_position,
     )
 
     # HUD Tracking
@@ -114,10 +116,7 @@ def run_game():
                         space, terrain_points, truck = init_world(
                             current_level_config,
                             current_truck_config,
-                            level_units_to_world(
-                                current_level_config.start_position,
-                                current_level_config.units_per_meter,
-                            ),
+                            default_start_position,
                         )
 
             screen.fill(menu_bg_color)
@@ -149,6 +148,7 @@ def run_game():
                         current_truck_config,
                         truck.chassis_body.position + pymunk.Vec2d(0, 2),
                     )
+                    level_time += 10
 
         # 2. INPUT & PHYSICS
         keys = pygame.key.get_pressed()
@@ -192,15 +192,14 @@ def run_game():
 
         # Draw HUD
         metrics = [
+            f"Time: {print_time(level_time)}",
             f"FPS: {int(display_fps)}",
             f"Speed: {display_speed:.1f} m/s",
             f"Front RPM: {int(display_rpm_f)}",
             f"Rear RPM: {int(display_rpm_r)}",
         ]
         for i, text in enumerate(metrics):
-            shadow = menu_font.render(text, True, (255, 255, 255))
             surf = menu_font.render(text, True, (0, 0, 0))
-            screen.blit(shadow, (22, 22 + i * 25))
             screen.blit(surf, (20, 20 + i * 25))
 
         # space.debug_draw(draw_options)
