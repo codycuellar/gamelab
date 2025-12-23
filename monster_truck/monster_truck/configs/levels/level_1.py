@@ -11,6 +11,5 @@ CONFIG = LevelConfig(
     ground_friction=1.0,
     gravity=(0, -8.81),
     start_position=Vec2d(230, 440),
-    # finish_line=3815,
-    finish_line=400,
+    finish_line=3815,
 )
