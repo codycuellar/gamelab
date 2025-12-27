@@ -1,4 +1,6 @@
+import random
 from pathlib import Path
+
 import pygame
 
 
@@ -10,6 +12,7 @@ class Music:
 
     def __init__(self):
         self.tracks = [s for s in self.music_dir.iterdir()]
+        random.shuffle(self.tracks)
         self.sounds = [pygame.mixer.Sound(t) for t in self.tracks]
         self.lengths = [s.get_length() for s in self.sounds]
         self.channels = [pygame.mixer.Channel(0), pygame.mixer.Channel(1)]

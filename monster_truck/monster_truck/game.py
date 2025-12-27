@@ -24,65 +24,86 @@ class ENGINE_STATES:
 
 
 class EngineSounds:
-    volume = 0.85
+    volume = 0.45
+    fade = 100
 
     def __init__(self):
-        self.channel = pygame.mixer.Channel(2)  # reserve a channel
+        self.loop_ch = pygame.mixer.Channel(2)  # idle / full throttle loops
+        self.trans_ch = pygame.mixer.Channel(3)  # accel / decel transitions
+        self.loop_ch.set_volume(self.volume)
+        self.trans_ch.set_volume(self.volume)
 
         self.start = pygame.mixer.Sound("assets/trucks/truck_1/sfx/truck_1_start.wav")
         self.idle = pygame.mixer.Sound("assets/trucks/truck_1/sfx/truck_1_idle.wav")
-        self.accelerate = pygame.mixer.Sound("assets/trucks/truck_1/sfx/accelerate.wav")
+        self.accel = pygame.mixer.Sound("assets/trucks/truck_1/sfx/accelerate.wav")
         self.full_throttle = pygame.mixer.Sound(
             "assets/trucks/truck_1/sfx/full_throttle.wav"
         )
-        self.decelerate = pygame.mixer.Sound("assets/trucks/truck_1/sfx/decelerate.wav")
+        self.decel = pygame.mixer.Sound("assets/trucks/truck_1/sfx/decelerate.wav")
+
         self.state = ENGINE_STATES.STOPPED
         self.wants_throttle = False
+        self.next_loop = self.idle
 
     def start_engine(self):
         if self.state != ENGINE_STATES.STOPPED:
             return
 
-        self.channel.play(self.start)
-        self.channel.queue(self.idle)
+        self.loop_ch.play(self.start)
         self.state = ENGINE_STATES.IDLE
+        self.next_loop = self.idle
 
     def set_throttle(self, state: bool):
         self.wants_throttle = state
 
+    def stop(self):
+        """Stop all engine sounds immediately and reset state."""
+        self.loop_ch.stop()
+        self.trans_ch.stop()
+        self.state = ENGINE_STATES.STOPPED
+        self.next_loop = self.idle
+        self.wants_throttle = False
+
     def step(self, _):
-        if self.channel.get_queue():
-            return
-
-        if self.state == ENGINE_STATES.IDLE:
-            if self.wants_throttle:
-                self.channel.play(self.accelerate)
+        # Handle throttle changes / transitions
+        if self.state in [ENGINE_STATES.IDLE, ENGINE_STATES.FULL_THROTTLE]:
+            if self.wants_throttle and self.state == ENGINE_STATES.IDLE:
+                self._play_transition(self.accel, self.full_throttle)
                 self.state = ENGINE_STATES.ACCEL
-            else:
-                self.channel.queue(self.idle)
-
-        elif self.state == ENGINE_STATES.ACCEL:
-            if self.wants_throttle:
-                self.channel.queue(self.full_throttle)
-                self.state = ENGINE_STATES.FULL_THROTTLE
-            else:
-                self.channel.play(self.decelerate)
+            elif not self.wants_throttle and self.state == ENGINE_STATES.FULL_THROTTLE:
+                self._play_transition(self.decel, self.idle)
                 self.state = ENGINE_STATES.DECEL
 
-        elif self.state == ENGINE_STATES.FULL_THROTTLE:
-            if self.wants_throttle:
-                self.channel.queue(self.full_throttle)
-            else:
-                self.channel.play(self.decelerate)
-                self.state = ENGINE_STATES.DECEL
+        if self.state == ENGINE_STATES.DECEL and self.wants_throttle:
+            self._play_transition(self.accel, self.full_throttle)
+            self.state = ENGINE_STATES.ACCEL
+        elif self.state == ENGINE_STATES.ACCEL and not self.wants_throttle:
+            self._play_transition(self.decel, self.idle)
+            self.state = ENGINE_STATES.DECEL
 
-        elif self.state == ENGINE_STATES.DECEL:
-            if self.wants_throttle:
-                self.channel.queue(self.accelerate)
-                self.state = ENGINE_STATES.ACCEL
-            else:
-                self.channel.queue(self.idle)
-                self.state = ENGINE_STATES.IDLE
+        # **Restart loop channel if transition finished**
+        if not self.trans_ch.get_busy():
+            # Only restart if loop channel is not currently playing
+            if not self.loop_ch.get_busy():
+                self.loop_ch.play(self.next_loop, loops=-1)
+                # Update state to loop type
+                if self.next_loop == self.idle:
+                    self.state = ENGINE_STATES.IDLE
+                else:
+                    self.state = ENGINE_STATES.FULL_THROTTLE
+
+    def _play_transition(self, sound, next_loop):
+        if self.trans_ch.get_busy():
+            self.trans_ch.stop()
+
+        # Fade the loop channel slightly
+        self.loop_ch.fadeout(self.fade)
+
+        # Play the new transition
+        self.trans_ch.play(sound)
+
+        # Update which loop to return to
+        self.next_loop = next_loop
 
 
 class Game:
@@ -187,6 +208,7 @@ class Game:
         ]:
             for shape in body.shapes:
                 if shape.bb.left <= self.finish_line <= shape.bb.right:
+                    self.sfx.stop()
                     return MENU_STATE.GAME_OVER
 
         # space.debug_draw(draw_options)
