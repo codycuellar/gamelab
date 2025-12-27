@@ -1,6 +1,20 @@
+from enum import Enum
+
 from monster_truck.configs.interfaces import TruckConfig, LevelConfig
 from monster_truck.configs.trucks import truck_1
 from monster_truck.configs.levels import level_1
+
+
+class MENU_STATE(Enum):
+    MAIN_MENU = 2
+    LEVEL_SELECT = 3
+    TRUCK_SELECT = 4
+    GAME_OVER = 5
+    PAUSE = 6
+    START_GAME = 100
+    RUN_GAME = 110
+    QUIT = 300
+
 
 # ---------- GAME DEFAULTS ----------
 FPS = 60
