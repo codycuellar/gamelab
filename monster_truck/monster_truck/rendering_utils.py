@@ -4,6 +4,12 @@ import pymunk
 from monster_truck.config import *
 
 
+def print_time(t: float):
+    minutes = int(t // 60)
+    seconds = int(t % 60)
+    return f"{minutes:02d}:{seconds:02d}"
+
+
 class SpriteRenderable:
     def __init__(
         self,

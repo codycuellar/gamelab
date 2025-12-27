@@ -6,12 +6,19 @@
   - High Scores
   - Quit
 - Game Complete Screen
+  - Score
+  - Top 3 high scores
+  - Menu
+    - Try Again
+    - Main Menu
 - Local Score Keeping (save score file locally)
-- Truck Physics:
-  - Ability to flip vehicle: hit roof with positive inertia
+- Truck Design:
+  - 3 Starter Trucks
+  - ✅ Ability to flip vehicle: hit roof with positive inertia
   - Maybe add torque limiting at top speed
 - Level Design:
-  - Static SVG level design
+  - 3 Starter Levels
+  - ✅ Static SVG level design
   - Takes x positional surface terrain definitions
     - Color
     - Friction

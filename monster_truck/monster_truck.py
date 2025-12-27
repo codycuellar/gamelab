@@ -1,14 +1,38 @@
 import math
 import sys
+
 import pygame
 import pymunk
 
 from monster_truck.config import *
 from monster_truck.truck import Truck
-from monster_truck.rendering_utils import Camera
+from monster_truck.rendering_utils import Camera, print_time
 from monster_truck.level_utils import load_level_geometry_from_svg, level_units_to_world
+from monster_truck.menus import MENU_STATE, main_menu, game_over
+
 
 pygame.init()
+
+
+class HUD:
+    def __init__(self):
+        self.update_interval = 0.25
+        self.timer = 0.0
+        self.display_fps = 0.0
+        self.display_speed = 0.0
+        self.display_rpm_f = 0.0
+        self.display_rpm_r = 0.0
+
+    def step(self, dt: float, truck: Truck, fps):
+        self.timer += dt
+
+        if self.timer >= self.update_interval:
+            self.display_speed = truck.chassis_body.velocity.length
+            rad_to_rpm = 60 / (2 * math.pi)
+            self.display_rpm_f = -truck.wheel_front_body.angular_velocity * rad_to_rpm
+            self.display_rpm_r = -truck.wheel_rear_body.angular_velocity * rad_to_rpm
+            self.display_fps = fps
+            self.timer = 0.0
 
 
 def init_world(
@@ -32,12 +56,6 @@ def init_world(
     return space, terrain_points, truck
 
 
-def print_time(t: float):
-    minutes = int(t // 60)
-    seconds = int(t % 60)
-    return f"{minutes:02d}:{seconds:02d}"
-
-
 def run_game():
     # Load configurations
     current_level_config = load_level_config()
@@ -57,8 +75,6 @@ def run_game():
     camera = Camera((SCREEN_W, SCREEN_H), screen_scale=PX_PER_METER)
 
     menu_font = pygame.font.SysFont("Arial", 20, bold=True)
-    menu_bg_color = (220, 247, 247)
-    menu_font_color = (125, 97, 95)
 
     space, terrain_points, truck = init_world(
         current_level_config,
@@ -66,20 +82,12 @@ def run_game():
         default_start_position,
     )
 
-    # HUD Tracking
-    metric_timer = 0.0
-    display_fps = 0.0
-    update_interval = 0.25
-    display_speed = 0.0
-    display_rpm_f = 0.0
-    display_rpm_r = 0.0
+    hud = HUD()
 
     level_time = 0
-    game_start = True
-    game_over = False
-
     menu_font = pygame.font.SysFont("Impact", 25)
 
+    state = MENU_STATE.MAIN_MENU
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -89,60 +97,36 @@ def run_game():
         for e in events:
             if e.type == pygame.QUIT:
                 running = False
+                continue
 
-        if game_start:
-            for e in events:
-                if e.type == pygame.KEYDOWN:
-                    if e.key == pygame.K_SPACE:
-                        game_start = False
-
-            screen.fill(menu_bg_color)
-            text = menu_font.render(
-                f"Press spacebar to start the game!",
-                True,
-                menu_font_color,
-            )
-            text_rect = text.get_rect(center=(SCREEN_W // 2, SCREEN_H // 2))
-            screen.blit(text, text_rect)
-            pygame.display.flip()
+        if state is MENU_STATE.MAIN_MENU:
+            state = main_menu(screen, events, menu_font)
             continue
-
-        if game_over:
-            for e in events:
-                if e.type == pygame.KEYDOWN:
-                    if e.key == pygame.K_SPACE:
-                        game_over = False
-                        level_time = 0
-                        space, terrain_points, truck = init_world(
-                            current_level_config,
-                            current_truck_config,
-                            default_start_position,
-                        )
-
-            screen.fill(menu_bg_color)
-            text = menu_font.render(
-                f"Level Complete! Your time: {print_time(level_time)}",
-                True,
-                menu_font_color,
-            )
-            text_rect = text.get_rect(center=(SCREEN_W // 2, SCREEN_H // 2))
-            screen.blit(text, text_rect)
-
-            text = menu_font.render(
-                f"Press spacebar to try again!", True, menu_font_color
-            )
-            text_rect = text.get_rect(center=(SCREEN_W // 2, SCREEN_H // 2 + 30))
-            screen.blit(text, text_rect)
-            pygame.display.flip()
+        elif state is MENU_STATE.GAME_OVER:
+            state = game_over(screen, events, menu_font, level_time)
             continue
+        elif state is MENU_STATE.QUIT:
+            running = False
+            continue
+        elif state is MENU_STATE.START_GAME:
+            space, terrain_points, truck = init_world(
+                current_level_config,
+                current_truck_config,
+                default_start_position,
+            )
+            level_time = 0
+            state = MENU_STATE.RUN_GAME
 
-        level_time += dt
+        # =====================================================================
+        # RUN THE ACTUAL GAME
+        # =====================================================================
 
         # 1. EVENT HANDLING (Use events for one-shot actions like Reset)
         for e in events:
             if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_ESCAPE:
+                    state = MENU_STATE.MAIN_MENU
                 if e.key == pygame.K_RETURN:
-                    # Instant reset using cached geometry
                     space, terrain_points, truck = init_world(
                         current_level_config,
                         current_truck_config,
@@ -163,47 +147,36 @@ def run_game():
         truck.motor.update_target(input_direction, keys[pygame.K_SPACE])
         truck.motor.step()
 
-        for body in [truck.chassis_body, truck.wheel_rear_body, truck.wheel_front_body]:
-            for shape in body.shapes:
-                bb = shape.bb
-                if bb.left <= finish_line <= bb.right:
-                    game_over = True
-
-        # 3. METRICS UPDATE
-        metric_timer += dt
-        if metric_timer >= update_interval:
-            display_speed = truck.chassis_body.velocity.length
-            rad_to_rpm = 60 / (2 * math.pi)
-            display_rpm_f = -truck.wheel_front_body.angular_velocity * rad_to_rpm
-            display_rpm_r = -truck.wheel_rear_body.angular_velocity * rad_to_rpm
-            display_fps = clock.get_fps()
-            metric_timer = 0.0
-
-        # 4. DRAWING
+        # DRAWING
         screen.fill((174, 211, 250))
-
-        # Draw Terrain (from our cached polylines)
         color = (173, 144, 127)
         if len(terrain_points) >= 2:
             points_px = [camera.to_screen_coords(pt) for pt in terrain_points]
             pygame.draw.lines(screen, color, False, points_px, 3)
-
         truck.draw(screen, camera)
 
         # Draw HUD
+        hud.step(dt, truck, clock.get_fps())
         metrics = [
             f"Time: {print_time(level_time)}",
-            f"FPS: {int(display_fps)}",
-            f"Speed: {display_speed:.1f} m/s",
-            f"Front RPM: {int(display_rpm_f)}",
-            f"Rear RPM: {int(display_rpm_r)}",
+            f"FPS: {int(hud.display_fps)}",
+            f"Speed: {hud.display_speed:.1f} m/s",
+            f"Front RPM: {int(hud.display_rpm_f)}",
+            f"Rear RPM: {int(hud.display_rpm_r)}",
         ]
         for i, text in enumerate(metrics):
             surf = menu_font.render(text, True, (0, 0, 0))
             screen.blit(surf, (20, 20 + i * 25))
 
+        # FINISH LINE
+        for body in [truck.chassis_body, truck.wheel_rear_body, truck.wheel_front_body]:
+            for shape in body.shapes:
+                if shape.bb.left <= finish_line <= shape.bb.right:
+                    state = MENU_STATE.GAME_OVER
+
         # space.debug_draw(draw_options)
         pygame.display.flip()
+        level_time += dt
 
 
 if __name__ == "__main__":
