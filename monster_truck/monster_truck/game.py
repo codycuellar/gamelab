@@ -1,4 +1,5 @@
 import math
+from enum import Enum
 
 import pygame
 from pymunk import Vec2d, Space
@@ -14,11 +15,83 @@ from monster_truck.level_utils import (
 )
 
 
+class ENGINE_STATES:
+    STOPPED = 0
+    IDLE = 1
+    ACCEL = 2
+    DECEL = 3
+    FULL_THROTTLE = 4
+
+
+class EngineSounds:
+    volume = 0.85
+
+    def __init__(self):
+        self.channel = pygame.mixer.Channel(2)  # reserve a channel
+
+        self.start = pygame.mixer.Sound("assets/trucks/truck_1/sfx/truck_1_start.wav")
+        self.idle = pygame.mixer.Sound("assets/trucks/truck_1/sfx/truck_1_idle.wav")
+        self.accelerate = pygame.mixer.Sound("assets/trucks/truck_1/sfx/accelerate.wav")
+        self.full_throttle = pygame.mixer.Sound(
+            "assets/trucks/truck_1/sfx/full_throttle.wav"
+        )
+        self.decelerate = pygame.mixer.Sound("assets/trucks/truck_1/sfx/decelerate.wav")
+        self.state = ENGINE_STATES.STOPPED
+        self.wants_throttle = False
+
+    def start_engine(self):
+        if self.state != ENGINE_STATES.STOPPED:
+            return
+
+        self.channel.play(self.start)
+        self.channel.queue(self.idle)
+        self.state = ENGINE_STATES.IDLE
+
+    def set_throttle(self, state: bool):
+        self.wants_throttle = state
+
+    def step(self, _):
+        if self.channel.get_queue():
+            return
+
+        if self.state == ENGINE_STATES.IDLE:
+            if self.wants_throttle:
+                self.channel.play(self.accelerate)
+                self.state = ENGINE_STATES.ACCEL
+            else:
+                self.channel.queue(self.idle)
+
+        elif self.state == ENGINE_STATES.ACCEL:
+            if self.wants_throttle:
+                self.channel.queue(self.full_throttle)
+                self.state = ENGINE_STATES.FULL_THROTTLE
+            else:
+                self.channel.play(self.decelerate)
+                self.state = ENGINE_STATES.DECEL
+
+        elif self.state == ENGINE_STATES.FULL_THROTTLE:
+            if self.wants_throttle:
+                self.channel.queue(self.full_throttle)
+            else:
+                self.channel.play(self.decelerate)
+                self.state = ENGINE_STATES.DECEL
+
+        elif self.state == ENGINE_STATES.DECEL:
+            if self.wants_throttle:
+                self.channel.queue(self.accelerate)
+                self.state = ENGINE_STATES.ACCEL
+            else:
+                self.channel.queue(self.idle)
+                self.state = ENGINE_STATES.IDLE
+
+
 class Game:
     screen_dims = (SCREEN_W, SCREEN_H)
     px_per_meter = PX_PER_METER
 
     def __init__(self, clock: pygame.time.Clock):
+        self.sfx = EngineSounds()
+
         self.level_config = load_level_config()
         self.truck_config = load_truck_config()
         self.default_start_position = level_units_to_world(
@@ -118,7 +191,13 @@ class Game:
 
         # space.debug_draw(draw_options)
         pygame.display.flip()
+
         self.level_time += dt
+
+        self.sfx.start_engine()  # always call this, but will only trigger once
+        self.sfx.set_throttle(input_direction != 0)
+        self.sfx.step(dt)
+
         return MENU_STATE.RUN_GAME
 
 

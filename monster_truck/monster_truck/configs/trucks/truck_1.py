@@ -10,7 +10,7 @@ from monster_truck.configs.interfaces import (
 )
 
 CHASSIS = ChassisConfig(
-    sprite_path="assets/trucks/truck_1_body.png",
+    sprite_path="assets/trucks/truck_1/truck_1_body.png",
     dimensions=Vec2d(4.7, 2.0),
     mass=3500,
     friction=0.15,
@@ -24,7 +24,7 @@ SUSPENSION = SuspensionConfig(
 )
 
 WHEEL_R = WheelConfig(
-    sprite_path="assets/trucks/truck_1_wheel.png",
+    sprite_path="assets/trucks/truck_1/truck_1_wheel.png",
     radius=0.9,
     mass=600,
     friction=0.75,
