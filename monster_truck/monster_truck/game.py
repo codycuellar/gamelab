@@ -115,9 +115,7 @@ class Game:
 
         self.level_config = load_level_config()
         self.truck_config = load_truck_config()
-        self.default_start_position = level_units_to_world(
-            self.level_config.start_position, self.level_config.units_per_meter
-        )
+        self.default_start_position = Vec2d(0, 0)
 
         self.clock = clock
         self.screen = pygame.display.set_mode(self.screen_dims)
@@ -133,9 +131,10 @@ class Game:
 
         self.hud = HUD()
 
-        self.init()
-
     def init(self):
+        self.default_start_position = level_units_to_world(
+            self.level_config.start_position, self.level_config.units_per_meter
+        )
         f_coord = self.level_config.finish_line
         self.finish_line = level_units_to_world(
             Vec2d(f_coord, f_coord), self.level_config.units_per_meter
@@ -208,7 +207,6 @@ class Game:
         ]:
             for shape in body.shapes:
                 if shape.bb.left <= self.finish_line <= shape.bb.right:
-                    self.sfx.stop()
                     return MENU_STATE.GAME_OVER
 
         # space.debug_draw(draw_options)

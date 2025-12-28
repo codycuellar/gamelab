@@ -5,7 +5,13 @@ import pygame
 from monster_truck.config import *
 from monster_truck.game import Game
 from monster_truck.music import Music
-from monster_truck.menus import MENU_STATE, main_menu, game_over, pause_screen
+from monster_truck.menus import (
+    MENU_STATE,
+    MainMenu,
+    LevelSelectMenu,
+    game_over,
+    pause_screen,
+)
 
 
 pygame.init()
@@ -13,14 +19,11 @@ pygame.init()
 
 def run_game():
     clock = pygame.time.Clock()
-
     game = Game(clock)
-
     music = Music()
-
     menu_font = pygame.font.SysFont("Impact", 25)
-
     state = MENU_STATE.MAIN_MENU
+    menu = None
 
     running = True
     while running:
@@ -33,22 +36,29 @@ def run_game():
                 return
             if e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_n:
-                    pass
                     music.next()
 
         if state == MENU_STATE.MAIN_MENU:
-            state = main_menu(game.screen, events, menu_font)
+            if not isinstance(menu, MainMenu):
+                menu = MainMenu(game.screen)
+            state = menu.step(events, dt)
             continue
+        elif state == MENU_STATE.LEVEL_SELECT:
+            if not isinstance(menu, LevelSelectMenu):
+                menu = LevelSelectMenu(game.screen)
+            state = menu.step(events, game, dt)
         elif state == MENU_STATE.GAME_OVER:
+            game.sfx.stop()
             state = game_over(game.screen, events, menu_font, game)
             continue
         elif state == MENU_STATE.PAUSE:
+            game.sfx.stop()
             state = pause_screen(game.screen, events, menu_font)
         elif state == MENU_STATE.QUIT:
             running = False
             continue
         elif state == MENU_STATE.START_GAME:
-            game = Game(clock)
+            game.init()
             state = MENU_STATE.RUN_GAME
         else:
             for e in events:
