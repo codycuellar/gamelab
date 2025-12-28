@@ -52,6 +52,21 @@ class Truck:
             config.wheel_front.dimensions,
         )
 
+    @property
+    def bb(self):
+        shapes = (
+            list(self.chassis_body.shapes)
+            + list(self.wheel_rear_body.shapes)
+            + list(self.wheel_front_body.shapes)
+        )
+
+        return pymunk.BB(
+            left=min(s.bb.left for s in shapes),
+            right=max(s.bb.right for s in shapes),
+            top=max(s.bb.top for s in shapes),
+            bottom=min(s.bb.bottom for s in shapes),
+        )
+
     def draw(self, screen: pygame.Surface, camera: Camera):
         draw_sprite(screen, self.chassis_renderable, camera)
         draw_sprite(screen, self.wheel_r_renderable, camera)

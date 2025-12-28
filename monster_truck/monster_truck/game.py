@@ -2,7 +2,7 @@ import math
 from enum import Enum
 
 import pygame
-from pymunk import Vec2d, Space
+from pymunk import Vec2d, Space, BB
 
 from monster_truck.config import *
 from monster_truck.rendering_utils import Camera, print_time
@@ -129,18 +129,15 @@ class Game:
         self.terrain_points: list[Vec2d] = []
         self.truck: Truck = None
 
+        self.checkpoints = []
+        self.checkpoint_i = 0
+
         self.hud = HUD()
 
     def init(self):
-        self.default_start_position = level_units_to_world(
-            self.level_config.start_position, self.level_config.units_per_meter
-        )
-        f_coord = self.level_config.finish_line
-        self.finish_line = level_units_to_world(
-            Vec2d(f_coord, f_coord), self.level_config.units_per_meter
-        ).x
         self.space = Space()
         self.space.gravity = self.level_config.gravity
+
         self.terrain_points = load_level_geometry_from_svg(
             self.space,
             self.level_config.svg_path,
@@ -148,6 +145,16 @@ class Game:
             self.level_config.samples_per_meter,
             self.level_config.ground_friction,
         )
+
+        pos = Vec2d(self.level_config.start_position, 0)
+        pos = self._to_world(pos)
+        self.default_start_position = self._get_truck_pos(pos.x)
+
+        self.finish_line = self._to_world(Vec2d(self.level_config.finish_line, 0))
+
+        self.checkpoints = [self.default_start_position] + [
+            self._to_world(Vec2d(x, 0)) for x in self.level_config.checkpoints
+        ]
 
         self.truck = Truck(
             self.truck_config,
@@ -159,9 +166,8 @@ class Game:
         self.truck = Truck(
             self.truck_config,
             self.space,
-            self.truck.chassis_body.position + Vec2d(0, 2),
+            self._get_truck_pos(self.checkpoints[self.checkpoint_i].x),
         )
-        self.level_time += 10
 
     def step(self, dt: float):
         self.space.step(dt)
@@ -199,17 +205,15 @@ class Game:
             surf = self.hud_font.render(text, True, (0, 0, 0))
             self.screen.blit(surf, (20, 20 + i * 25))
 
-        # FINISH LINE
-        for body in [
-            self.truck.chassis_body,
-            self.truck.wheel_rear_body,
-            self.truck.wheel_front_body,
-        ]:
-            for shape in body.shapes:
-                if shape.bb.left <= self.finish_line <= shape.bb.right:
-                    return MENU_STATE.GAME_OVER
+        # CHECKPOINTS / FINISH LINE
+        truck_bb = self.truck.bb
+        if self.checkpoint_i < len(self.checkpoints) - 2:
+            if truck_bb.right >= self.checkpoints[self.checkpoint_i + 1].x:
+                self.checkpoint_i += 1
 
-        # space.debug_draw(draw_options)
+        if truck_bb.right >= self.finish_line.x:
+            return MENU_STATE.GAME_OVER
+
         pygame.display.flip()
 
         self.level_time += dt
@@ -219,6 +223,36 @@ class Game:
         self.sfx.step(dt)
 
         return MENU_STATE.RUN_GAME
+
+    def _to_world(self, pos: Vec2d):
+        return level_units_to_world(pos, self.level_config.units_per_meter)
+
+    def _get_truck_pos(self, x_axis: float):
+        points: list[Vec2d] = []
+        for i, current in enumerate(self.terrain_points):
+            if i >= len(self.terrain_points) - 1:
+                continue
+            next = self.terrain_points[i + 1]
+            if (current.x <= x_axis and next.x >= x_axis) or (
+                current.x >= x_axis and next.x <= x_axis
+            ):
+                points.append(current)
+                points.append(next)
+
+        print(points)
+        if len(points) == 0:
+            raise Exception(
+                f"x-axis position {x_axis} does not intersect with ground plane."
+            )
+
+        highest = points.pop()
+        while len(points) > 0:
+            p = points.pop()
+            if p.y > highest.y:
+                highest = p
+
+        print("highest", highest)
+        return highest + Vec2d(0, 5)
 
 
 class HUD:

@@ -138,10 +138,14 @@ class LevelConfig:
         ground_friction: (coeff) The friction coefficient of the ground.
         gravity: (m/s^2) The world gravity.
         start_position:
-            The level SVG relative x/y coordinates to start the truck on.
+            The level x coordinate to start the truck on. The y value is calculated
+            by the nearest, most vertical goround plane points.
         finish_line:
             The level SVG relative x coordinate the truck must pass to complete
             the level.
+        checkpoints:
+            x axis positions to provide checkpoints. If the player is stuck and
+            resets the truck, they will spawn back at the nearest checkpoint.
     """
 
     name: str
@@ -150,5 +154,6 @@ class LevelConfig:
     samples_per_meter: int
     ground_friction: float
     gravity: float
-    start_position: Vec2d
+    start_position: float
     finish_line: float
+    checkpoints: list[float]

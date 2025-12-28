@@ -10,8 +10,9 @@ LEVELS = [
         samples_per_meter=2,
         ground_friction=1.0,
         gravity=(0, -8.81),
-        start_position=Vec2d(230, 440),
+        start_position=230,
         finish_line=3815,
+        checkpoints=[1433, 2493],
     ),
     LevelConfig(
         name="Hills-n-Gaps",
@@ -20,7 +21,8 @@ LEVELS = [
         samples_per_meter=2,
         ground_friction=1.2,
         gravity=(0, -6.81),
-        start_position=Vec2d(130, 930),
+        start_position=130,
         finish_line=3950,
+        checkpoints=[930, 1700, 2100, 3350],
     ),
 ]

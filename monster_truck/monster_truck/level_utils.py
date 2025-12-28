@@ -86,7 +86,7 @@ def sample_paths(
     return points
 
 
-def level_units_to_world(position: Vec2d, level_to_world_units: float):
+def level_units_to_world(position: Vec2d | float, level_to_world_units: float):
     """
     Convert coordinates in level design space to world relative units. This
     scales the values and flips the Y-axis, since input files are +Y down, and
